@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 
@@ -11,43 +12,38 @@ class ProductAdminScreen extends StatefulWidget {
 
 class _ProductAdminScreenState extends State<ProductAdminScreen> {
   List<dynamic> products = [];
-  List<dynamic> categories = []; // ✅ danh sách danh mục
+  List<dynamic> categories = [];
   bool loading = true;
 
   final _nameCtrl = TextEditingController();
   final _skuCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final _stockCtrl = TextEditingController();
-  int? selectedCategoryId; // ✅ id danh mục được chọn
+  int? selectedCategoryId;
 
-  // ======================== LOAD DATA ========================
   Future<void> loadData() async {
     setState(() => loading = true);
     final client = context.read<AuthProvider>().client!;
-
-    // Lấy sản phẩm
     final prodData = await client.get('/api/products');
-    products = (prodData is Map<String, dynamic> && prodData.containsKey('items'))
+    final catData = await client.get('/api/categories');
+
+    products = (prodData is Map && prodData['items'] != null)
         ? prodData['items']
         : (prodData is List ? prodData : []);
-
-    // Lấy danh mục
-    final catData = await client.get('/api/categories');
-    categories = (catData is Map<String, dynamic> && catData.containsKey('items'))
+    categories = (catData is Map && catData['items'] != null)
         ? catData['items']
         : (catData is List ? catData : []);
 
     setState(() => loading = false);
   }
 
-  // ======================== ADD ========================
   Future<void> addProduct() async {
     final client = context.read<AuthProvider>().client!;
     if (_nameCtrl.text.trim().isEmpty ||
         _skuCtrl.text.trim().isEmpty ||
         selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("⚠️ Vui lòng nhập đủ thông tin & chọn danh mục")),
+        const SnackBar(content: Text("⚠️ Vui lòng nhập đầy đủ thông tin!")),
       );
       return;
     }
@@ -60,38 +56,33 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
       "categoryId": selectedCategoryId,
     };
 
-    try {
-      await client.post('/api/products', body);
-      _nameCtrl.clear();
-      _skuCtrl.clear();
-      _priceCtrl.clear();
-      _stockCtrl.clear();
-      selectedCategoryId = null;
-      await loadData();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("✅ Thêm sản phẩm thành công!")),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("❌ Lỗi thêm sản phẩm: $e")),
-        );
-      }
+    await client.post('/api/products', body);
+    _nameCtrl.clear();
+    _skuCtrl.clear();
+    _priceCtrl.clear();
+    _stockCtrl.clear();
+    selectedCategoryId = null;
+    await loadData();
+
+    if (mounted) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text("✅ Đã thêm sản phẩm!")));
     }
   }
 
-  // ======================== DELETE ========================
   Future<void> deleteProduct(int id) async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Xóa sản phẩm?"),
-        content: const Text("Bạn có chắc muốn xóa sản phẩm này?"),
+        title: const Text("🗑️ Xóa sản phẩm?"),
+        content: const Text("Bạn có chắc muốn xóa sản phẩm này không?"),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Hủy")),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("Xóa")),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text("Xóa"),
+          ),
         ],
       ),
     );
@@ -102,7 +93,6 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
     await loadData();
   }
 
-  // ======================== EDIT ========================
   Future<void> editProduct(Map<String, dynamic> p) async {
     final name = TextEditingController(text: p['name']);
     final price = TextEditingController(text: "${p['price']}");
@@ -112,7 +102,7 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
     await showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Sửa sản phẩm'),
+        title: const Text("✏️ Sửa sản phẩm"),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -124,12 +114,10 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
               DropdownButtonFormField<int>(
                 value: categoryId,
                 items: categories
-                    .map<DropdownMenuItem<int>>(
-                      (c) => DropdownMenuItem<int>(
-                    value: c['id'],
-                    child: Text(c['name']),
-                  ),
-                )
+                    .map<DropdownMenuItem<int>>((c) => DropdownMenuItem<int>(
+                  value: c['id'],
+                  child: Text(c['name']),
+                ))
                     .toList(),
                 onChanged: (v) => categoryId = v ?? categoryId,
                 decoration: const InputDecoration(labelText: "Danh mục"),
@@ -139,7 +127,7 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Hủy')),
-          FilledButton(
+          FilledButton.icon(
             onPressed: () async {
               final client = context.read<AuthProvider>().client!;
               await client.put('/api/products/${p['id']}', {
@@ -153,7 +141,8 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
               if (context.mounted) Navigator.pop(context);
               await loadData();
             },
-            child: const Text('Lưu'),
+            icon: const Icon(Icons.save),
+            label: const Text('Lưu'),
           ),
         ],
       ),
@@ -166,85 +155,160 @@ class _ProductAdminScreenState extends State<ProductAdminScreen> {
     loadData();
   }
 
-  // ======================== UI ========================
   @override
   Widget build(BuildContext context) {
-    if (loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
-    }
+    const primary = Color(0xFF2563EB);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F7FA),
       appBar: AppBar(
-        title: const Text("🛍️ Quản lý Sản phẩm"),
+        backgroundColor: primary,
+        title: Row(
+          children: [
+            const Icon(Icons.shopping_bag, color: Colors.white),
+            const SizedBox(width: 8),
+            const Text("Quản lý sản phẩm", style: TextStyle(color: Colors.white)),
+          ],
+        ),
         actions: [
-          IconButton(onPressed: loadData, icon: const Icon(Icons.refresh)),
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.white), onPressed: loadData),
         ],
       ),
-      body: RefreshIndicator(
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
         onRefresh: loadData,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            const Text("Thêm sản phẩm mới", style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            TextField(controller: _nameCtrl, decoration: const InputDecoration(labelText: 'Tên')),
-            TextField(controller: _skuCtrl, decoration: const InputDecoration(labelText: 'SKU')),
-            TextField(
-              controller: _priceCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Giá'),
+            // ==== Form thêm sản phẩm ====
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: const [
+                  BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("➕ Thêm sản phẩm mới",
+                      style: GoogleFonts.inter(
+                          fontWeight: FontWeight.w600, fontSize: 16)),
+                  const SizedBox(height: 12),
+                  TextField(
+                      controller: _nameCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'Tên sản phẩm', border: OutlineInputBorder())),
+                  const SizedBox(height: 8),
+                  TextField(
+                      controller: _skuCtrl,
+                      decoration: const InputDecoration(
+                          labelText: 'SKU', border: OutlineInputBorder())),
+                  const SizedBox(height: 8),
+                  TextField(
+                      controller: _priceCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: 'Giá', border: OutlineInputBorder())),
+                  const SizedBox(height: 8),
+                  TextField(
+                      controller: _stockCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                          labelText: 'Tồn kho', border: OutlineInputBorder())),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<int>(
+                    value: selectedCategoryId,
+                    items: categories
+                        .map<DropdownMenuItem<int>>(
+                            (cat) => DropdownMenuItem<int>(
+                          value: cat['id'],
+                          child: Text(cat['name']),
+                        ))
+                        .toList(),
+                    onChanged: (v) => setState(() => selectedCategoryId = v),
+                    decoration: const InputDecoration(
+                        labelText: "Danh mục", border: OutlineInputBorder()),
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: addProduct,
+                      icon: const Icon(Icons.add),
+                      label: const Text('Thêm'),
+                      style: FilledButton.styleFrom(
+                        backgroundColor: primary,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 14),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            TextField(
-              controller: _stockCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Tồn kho'),
-            ),
-            const SizedBox(height: 8),
 
-            // ✅ Dropdown chọn danh mục
-            DropdownButtonFormField<int>(
-              value: selectedCategoryId,
-              items: categories
-                  .map<DropdownMenuItem<int>>(
-                    (cat) => DropdownMenuItem<int>(
-                  value: cat['id'],
-                  child: Text(cat['name']),
+            const SizedBox(height: 24),
+
+            Text("📋 Danh sách sản phẩm",
+                style: GoogleFonts.inter(
+                    fontWeight: FontWeight.w600, fontSize: 18)),
+            const SizedBox(height: 12),
+
+            if (products.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(
+                  child: Text("Không có sản phẩm nào.",
+                      style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ),
               )
-                  .toList(),
-              onChanged: (v) => setState(() => selectedCategoryId = v),
-              decoration: const InputDecoration(labelText: "Danh mục"),
-            ),
-
-            const SizedBox(height: 12),
-            FilledButton.icon(
-              onPressed: addProduct,
-              icon: const Icon(Icons.add),
-              label: const Text('Thêm'),
-            ),
-            const Divider(height: 32),
-
-            // Danh sách sản phẩm
-            ...products.map((p) => Card(
-              color: Colors.grey.shade50,
-              child: ListTile(
-                title: Text(p['name']),
-                subtitle: Text("SKU: ${p['sku']} • Giá: ${p['price']} đ • Tồn: ${p['stock']}"),
-                trailing: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.edit, color: Colors.blue),
-                      onPressed: () => editProduct(p),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.delete, color: Colors.red),
-                      onPressed: () => deleteProduct(p['id']),
-                    ),
+            else
+              ...products.map((p) => Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: const [
+                    BoxShadow(
+                        color: Colors.black12,
+                        blurRadius: 6,
+                        offset: Offset(0, 3)),
                   ],
                 ),
-              ),
-            )),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: primary.withOpacity(0.1),
+                    child: const Icon(Icons.inventory_2_outlined,
+                        color: primary),
+                  ),
+                  title: Text(
+                    p['name'],
+                    style: GoogleFonts.inter(
+                        fontWeight: FontWeight.w600, fontSize: 16),
+                  ),
+                  subtitle: Text(
+                    "SKU: ${p['sku']} • Giá: ${p['price']} đ • Tồn: ${p['stock']}",
+                    style: GoogleFonts.inter(color: Colors.black54),
+                  ),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                          icon: const Icon(Icons.edit,
+                              color: Colors.blueAccent),
+                          onPressed: () => editProduct(p)),
+                      IconButton(
+                          icon: const Icon(Icons.delete_outline,
+                              color: Colors.redAccent),
+                          onPressed: () => deleteProduct(p['id'])),
+                    ],
+                  ),
+                ),
+              )),
           ],
         ),
       ),
