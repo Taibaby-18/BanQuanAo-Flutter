@@ -11,7 +11,8 @@ import '../models/cart_item.dart';
 import 'cart_screen.dart';
 import 'orders_screen.dart';
 import 'report_screen.dart';
-import '../widgets/checkout_sheet.dart' show CheckoutSheet, CheckoutInput, PaymentMethodUI;
+import '../widgets/checkout_sheet.dart'
+    show CheckoutSheet, CheckoutInput, PaymentMethodUI;
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -22,23 +23,63 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final _search = TextEditingController();
 
+  // 🟢 Thêm các biến quản lý dữ liệu
+  bool loading = true;
+  List<dynamic> products = [];
+  List<dynamic> categories = [];
+  int? selectedCategoryId;
+
+  // 🟢 HÀM TẢI DỮ LIỆU BAN ĐẦU
+  Future<void> loadData() async {
+    setState(() => loading = true);
+    final client = context.read<AuthProvider>().client!;
+    final prodData = await client.get('/api/products');
+    final catData = await client.get('/api/categories');
+
+    products = (prodData is Map && prodData['items'] != null)
+        ? prodData['items']
+        : (prodData is List ? prodData : []);
+    categories = (catData is Map && catData['items'] != null)
+        ? catData['items']
+        : (catData is List ? catData : []);
+    setState(() => loading = false);
+  }
+
+  // 🟢 HÀM LỌC THEO DANH MỤC
+  Future<void> filterByCategory(int? id) async {
+    setState(() => loading = true);
+    final client = context.read<AuthProvider>().client!;
+    final url =
+    id == null || id == 0 ? '/api/products' : '/api/products?categoryId=$id';
+    final data = await client.get(url);
+    products = (data is Map && data['items'] != null)
+        ? data['items']
+        : (data is List ? data : []);
+    selectedCategoryId = id;
+    setState(() => loading = false);
+  }
+
+  // 🟢 HÀM TÌM KIẾM SẢN PHẨM
+  Future<void> searchProducts(String query) async {
+    setState(() => loading = true);
+    final client = context.read<AuthProvider>().client!;
+    final data = await client.get('/api/products?q=$query');
+    products = (data is Map && data['items'] != null)
+        ? data['items']
+        : (data is List ? data : []);
+    setState(() => loading = false);
+  }
+
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final pp = context.read<ProductProvider>();
-      pp.loadCategories();
-      pp.loadProducts();
-    });
+    loadData(); // ✅ gọi API khi mở trang
   }
 
   @override
   Widget build(BuildContext context) {
-    final pp = context.watch<ProductProvider>();
     final cart = context.watch<CartProvider>();
-
-    final theme = Theme.of(context);
-    final primary = const Color(0xFF2563EB);
+    const primary = Color(0xFF2563EB);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FA),
@@ -48,7 +89,18 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Image.asset('assets/images/hutech_logo.png', height: 28),
             const SizedBox(width: 8),
-            const Text("POS Bán hàng HUTECH", style: TextStyle(color: Colors.white)),
+            const Expanded(
+              child: Text(
+                "POS Bán hàng",
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 16,
+                ),
+              ),
+            ),
           ],
         ),
         actions: [
@@ -70,7 +122,8 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           Stack(children: [
             IconButton(
-              icon: const Icon(Icons.shopping_cart_outlined, color: Colors.white),
+              icon:
+              const Icon(Icons.shopping_cart_outlined, color: Colors.white),
               onPressed: () => Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const CartScreen()),
@@ -83,8 +136,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: CircleAvatar(
                   radius: 8,
                   backgroundColor: Colors.redAccent,
-                  child: Text("${cart.items.length}",
-                      style: const TextStyle(fontSize: 10, color: Colors.white)),
+                  child: Text(
+                    "${cart.items.length}",
+                    style: const TextStyle(fontSize: 10, color: Colors.white),
+                  ),
                 ),
               ),
           ]),
@@ -94,97 +149,85 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: () async {
               await context.read<AuthProvider>().logout();
               if (context.mounted) {
-                Navigator.of(context).pushNamedAndRemoveUntil('/login', (_) => false);
+                Navigator.of(context)
+                    .pushNamedAndRemoveUntil('/login', (_) => false);
               }
             },
           ),
         ],
       ),
 
-      // ===== Body =====
-      body: Column(
-        children: [
-          // ===== Search + Filter =====
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: TextField(
+      // ===== BODY =====
+      body: loading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+        onRefresh: loadData,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // ===== Search =====
+            TextField(
               controller: _search,
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.white,
                 hintText: "🔍 Tìm theo tên hoặc SKU...",
                 prefixIcon: const Icon(Icons.search),
-                suffixIcon: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    IconButton(
-                      tooltip: 'Lọc nâng cao',
-                      icon: const Icon(Icons.tune),
-                      onPressed: () async {
-                        final result = await showModalBottomSheet<_FilterResult>(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.white,
-                          shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                          builder: (_) => FilterSheet(
-                            minPrice: pp.minPrice,
-                            maxPrice: pp.maxPrice,
-                            sort: pp.sort,
-                          ),
-                        );
-                        if (result != null) {
-                          await pp.loadProducts(
-                            minPrice: result.minPrice,
-                            maxPrice: result.maxPrice,
-                            sort: result.sort,
-                          );
-                        }
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.clear),
-                      tooltip: 'Xóa tìm kiếm',
-                      onPressed: () async {
-                        _search.clear();
-                        pp.clearFilters();
-                        await pp.loadProducts();
-                      },
-                    ),
-                  ],
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.clear),
+                  tooltip: 'Xóa tìm kiếm',
+                  onPressed: () async {
+                    _search.clear();
+                    await loadData();
+                  },
                 ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(16),
                 ),
               ),
-              onSubmitted: (txt) =>
-                  pp.loadProducts(query: txt.trim().isEmpty ? null : txt.trim()),
+              onSubmitted: (txt) async {
+                if (txt.trim().isEmpty) {
+                  await loadData();
+                } else {
+                  await searchProducts(txt.trim());
+                }
+              },
             ),
-          ),
+            const SizedBox(height: 12),
 
-          // ===== Category + Refresh =====
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-            child: Row(
+            // ===== Dropdown danh mục =====
+            Row(
               children: [
                 Expanded(
                   child: DropdownButtonFormField<int>(
+                    value: selectedCategoryId ?? 0,
                     isExpanded: true,
-                    value: pp.categoryId ?? 0,
-                    items: pp.categories
-                        .map((c) => DropdownMenuItem<int>(
-                      value: c.id,
-                      child: Text(c.name),
-                    ))
-                        .toList(),
-                    onChanged: (v) async => pp.loadProducts(categoryId: v),
+                    items: [
+                      const DropdownMenuItem<int>(
+                        value: 0,
+                        child: Text("Tất cả danh mục"),
+                      ),
+                      ...categories.map<DropdownMenuItem<int>>(
+                            (c) => DropdownMenuItem<int>(
+                          value: c['id'],
+                          child: Text(
+                            c['name'],
+                            overflow: TextOverflow.ellipsis,
+                            style: GoogleFonts.inter(fontSize: 14),
+                          ),
+                        ),
+                      ),
+                    ],
+                    onChanged: (v) async => await filterByCategory(v),
                     decoration: InputDecoration(
                       labelText: "Danh mục",
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
-                      contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      filled: true,
+                      fillColor: Colors.white,
                     ),
                   ),
                 ),
@@ -192,59 +235,37 @@ class _HomeScreenState extends State<HomeScreen> {
                 FilledButton.icon(
                   icon: const Icon(Icons.refresh),
                   label: const Text("Tải lại"),
-                  onPressed: () => pp.loadProducts(),
+                  onPressed: loadData,
                 ),
               ],
             ),
-          ),
+            const SizedBox(height: 16),
 
-          // ===== Grid sản phẩm =====
-          Expanded(
-            child: pp.loading
-                ? const Center(child: CircularProgressIndicator())
-                : GridView.builder(
-              padding: const EdgeInsets.all(12),
-              itemCount: pp.products.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.75,
+            // ===== DANH SÁCH SẢN PHẨM =====
+            if (products.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Text(
+                    "Không có sản phẩm nào.",
+                    style: TextStyle(color: Colors.grey, fontSize: 16),
+                  ),
+                ),
+              )
+            else
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: products
+                    .map((p) =>
+                    _productCard(context, Product.fromJson(p)))
+                    .toList(),
               ),
-              itemBuilder: (_, i) => _ProductTile(pp.products[i]),
-            ),
-          ),
-
-          // ===== Pagination =====
-          if (!pp.loading)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-              child: Row(
-                children: [
-                  Text(
-                    "Trang ${pp.page}/${pp.totalPages} • ${pp.total} sản phẩm",
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w500),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_left),
-                    onPressed: pp.page > 1
-                        ? () => pp.loadProducts(page: pp.page - 1)
-                        : null,
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.chevron_right),
-                    onPressed: pp.page < pp.totalPages
-                        ? () => pp.loadProducts(page: pp.page + 1)
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
 
-      // ===== Bottom thanh toán =====
+      // ===== BOTTOM THANH TOÁN =====
       bottomNavigationBar: Container(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
         decoration: const BoxDecoration(
@@ -258,8 +279,10 @@ class _HomeScreenState extends State<HomeScreen> {
             Expanded(
               child: Text(
                 "Tổng: ${cart.total.toStringAsFixed(0)} đ",
-                style: theme.textTheme.titleMedium!
-                    .copyWith(fontWeight: FontWeight.bold, color: primary),
+                style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: primary),
               ),
             ),
             FilledButton.icon(
@@ -268,7 +291,8 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: cart.items.isEmpty
                   ? null
                   : () async {
-                final result = await showModalBottomSheet<CheckoutInput>(
+                final result =
+                await showModalBottomSheet<CheckoutInput>(
                   context: context,
                   isScrollControlled: true,
                   builder: (_) => const CheckoutSheet(),
@@ -279,7 +303,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   result.paymentMethod == PaymentMethodUI.transfer
                       ? "Transfer"
                       : "Cash";
-                  final id = await context.read<CartProvider>().checkoutWithCustomer(
+                  final id = await context
+                      .read<CartProvider>()
+                      .checkoutWithCustomer(
                     customerName: result.name,
                     customerPhone: result.phone,
                     printReceipt: result.printReceipt,
@@ -292,7 +318,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ? "CHUYỂN KHOẢN"
                         : "TIỀN MẶT";
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content: Text("✅ Đã lập hóa đơn #$id ($label)")));
+                        content:
+                        Text("✅ Đã lập hóa đơn #$id ($label)")));
                   }
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
@@ -305,142 +332,95 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-}
 
-// ====== Tile sản phẩm ======
-class _ProductTile extends StatelessWidget {
-  final Product p;
-  const _ProductTile(this.p);
+  // 🟢 CARD SẢN PHẨM
+  Widget _productCard(BuildContext context, Product p) {
+    const primary = Color(0xFF2563EB);
+    const placeholderImage =
+        "https://cdn-icons-png.flaticon.com/512/7874/7874609.png"; // ảnh mặc định
 
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      elevation: 3,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+    // Nếu không có ảnh => dùng ảnh mặc định
+    final imageUrl = (p.imageUrl == null || p.imageUrl!.isEmpty)
+        ? placeholderImage
+        : p.imageUrl!;
+
+    return Container(
+      width: MediaQuery.of(context).size.width / 2 - 24,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Colors.black12, blurRadius: 6, offset: Offset(0, 3))
+        ],
+      ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: p.imageUrl == null
-                ? const Center(child: Icon(Icons.image, size: 64, color: Colors.grey))
-                : ClipRRect(
+          AspectRatio(
+            aspectRatio: 1,
+            child: ClipRRect(
               borderRadius:
               const BorderRadius.vertical(top: Radius.circular(16)),
-              child: Image.network(p.imageUrl!, fit: BoxFit.cover),
-            ),
-          ),
-          ListTile(
-            title: Text(p.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style:
-                const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-            subtitle: Text(
-              "${p.price.toStringAsFixed(0)} đ • Tồn: ${p.stock}",
-              style: const TextStyle(fontSize: 13),
+              child: Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => const Center(
+                  child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                ),
+                loadingBuilder: (context, child, loadingProgress) {
+                  if (loadingProgress == null) return child;
+                  return const Center(child: CircularProgressIndicator());
+                },
+              ),
             ),
           ),
           Padding(
-            padding: const EdgeInsets.only(left: 12, right: 8, bottom: 8),
-            child: Row(
-              children: [
-                Expanded(
-                    child: Text("SKU: ${p.sku}",
-                        style:
-                        const TextStyle(fontSize: 12, color: Colors.grey))),
-                IconButton(
-                  icon: const Icon(Icons.add_circle_outline, color: Colors.blue),
-                  onPressed: () {
-                    context.read<CartProvider>().add(CartItem(product: p, quantity: 1));
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text("🛒 Đã thêm vào giỏ hàng"),
-                        duration: Duration(milliseconds: 800),
-                      ),
-                    );
-                  },
+            padding: const EdgeInsets.all(8),
+            child: Text(
+              p.name,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style:
+              GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 14),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Text(
+              "${p.price.toStringAsFixed(0)} đ • Tồn: ${p.stock}",
+              style: const TextStyle(fontSize: 13, color: Colors.black54),
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: Padding(
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: Text(
+                    "SKU: ${p.sku}",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11, color: Colors.grey),
+                  ),
                 ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ====== Filter Sheet ======
-class _FilterResult {
-  final double? minPrice, maxPrice;
-  final String? sort;
-  _FilterResult({this.minPrice, this.maxPrice, this.sort});
-}
-
-class FilterSheet extends StatefulWidget {
-  final double? minPrice, maxPrice;
-  final String? sort;
-  const FilterSheet({super.key, this.minPrice, this.maxPrice, this.sort});
-
-  @override
-  State<FilterSheet> createState() => _FilterSheetState();
-}
-
-class _FilterSheetState extends State<FilterSheet> {
-  RangeValues _range = const RangeValues(0, 500000);
-  String? _sort;
-
-  @override
-  void initState() {
-    super.initState();
-    _sort = widget.sort ?? 'name_asc';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom, top: 16),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text("Bộ lọc sản phẩm",
-              style: Theme.of(context).textTheme.titleMedium),
-          const Divider(),
-          RangeSlider(
-            min: 0,
-            max: 1000000,
-            divisions: 100,
-            values: _range,
-            labels: RangeLabels(
-                "${_range.start.toInt()}đ", "${_range.end.toInt()}đ"),
-            onChanged: (v) => setState(() => _range = v),
-          ),
-          DropdownButtonFormField<String>(
-            value: _sort,
-            items: const [
-              DropdownMenuItem(value: 'name_asc', child: Text('Tên A→Z')),
-              DropdownMenuItem(value: 'name_desc', child: Text('Tên Z→A')),
-              DropdownMenuItem(value: 'price_asc', child: Text('Giá tăng dần')),
-              DropdownMenuItem(value: 'price_desc', child: Text('Giá giảm dần')),
-            ],
-            onChanged: (v) => setState(() => _sort = v),
-            decoration: const InputDecoration(labelText: 'Sắp xếp theo'),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: () => Navigator.pop(
-              context,
-              _FilterResult(
-                minPrice: _range.start <= 0 ? null : _range.start,
-                maxPrice: _range.end >= 1000000 ? null : _range.end,
-                sort: _sort,
               ),
-            ),
-            child: const Text("Áp dụng"),
+              IconButton(
+                icon: const Icon(Icons.add_circle_outline, color: primary),
+                onPressed: () {
+                  context
+                      .read<CartProvider>()
+                      .add(CartItem(product: p, quantity: 1));
+                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                    content: Text("🛒 Đã thêm vào giỏ hàng"),
+                    duration: Duration(milliseconds: 700),
+                  ));
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
         ],
       ),
     );
   }
+
 }

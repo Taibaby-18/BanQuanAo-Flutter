@@ -31,10 +31,10 @@ class _ReportScreenState extends State<ReportScreen> {
         backgroundColor: primary,
         title: Row(
           children: [
-            Image.asset('assets/images/hutech_logo.png', height: 28),
+            // Image.asset('assets/images/hutech_logo.png', height: 28),
             const SizedBox(width: 8),
             const Text(
-              "Báo cáo doanh số",
+              "Báo cáo",
               style: TextStyle(color: Colors.white),
             ),
           ],

@@ -3,7 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:http/http.dart' as http;
 
 class AuthService {
-  final _base = "https://localhost:7034"; // URL API của bạn
+  final _base = "http://192.168.100.46:5140"; // URL API của bạn
 
   Future<Map<String, dynamic>> login(String username, String password) async {
     final url = Uri.parse("$_base/api/Auth/login");

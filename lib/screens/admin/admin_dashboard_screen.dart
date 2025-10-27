@@ -66,7 +66,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             Image.asset('assets/images/hutech_logo.png', height: 28),
             const SizedBox(width: 8),
             const Text(
-              "Bảng điều khiển Admin",
+              "Quản lý",
               style: TextStyle(color: Colors.white),
             ),
           ],
@@ -111,90 +111,161 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: loadData,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            // ====== Tổng quan ======
-            Text(
-              "📈 Tổng quan hệ thống",
-              style: GoogleFonts.inter(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 12),
-            // ====== GỌI TRONG BODY ======
-            _summarySection(context),
-            const SizedBox(height: 24),
-
-            const SizedBox(height: 24),
-
-            // ====== Top nhân viên ======
-            Text(
-              "🏆 Top Nhân viên",
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            if (topEmployees != null && topEmployees!.isNotEmpty)
-              ...topEmployees!.map((e) => Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.indigo.withOpacity(0.1),
-                    child: const Icon(Icons.person, color: Colors.indigo),
-                  ),
-                  title: Text(
-                    e["employee"].toString(),
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    "Doanh thu: ${e["revenue"]} đ (${e["orders"]} đơn)",
-                    style: const TextStyle(color: Colors.black54),
+        body: RefreshIndicator(
+          onRefresh: loadData,
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "📈 Thống kê",
+                  style: GoogleFonts.inter(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
-              )),
-            if (topEmployees == null || topEmployees!.isEmpty)
-              const Text("Không có dữ liệu nhân viên."),
-
-            const SizedBox(height: 24),
-
-            // ====== Top sản phẩm ======
-            Text(
-              "🔥 Top sản phẩm bán chạy",
-              style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 8),
-            if (topProducts != null && topProducts!.isNotEmpty)
-              ...topProducts!.map((e) => Card(
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: Colors.purple.withOpacity(0.1),
-                    child: const Icon(Icons.shopping_bag, color: Colors.purple),
-                  ),
-                  title: Text(
-                    e["product"].toString(),
-                    style: GoogleFonts.inter(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    "Đã bán: ${e["qtySold"]} • Doanh thu: ${e["revenue"]} đ",
-                    style: const TextStyle(color: Colors.black54),
-                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: [
+                    _summaryCard("Đơn hàng", summary?["totalOrders"].toString(),
+                        Icons.receipt_long, Colors.indigo),
+                    _summaryCard("Doanh thu", "${summary?["totalRevenue"]} đ",
+                        Icons.monetization_on, Colors.green),
+                    _summaryCard("Khách hàng", summary?["totalCustomers"].toString(),
+                        Icons.people, Colors.orange),
+                    _summaryCard("Sản phẩm", summary?["totalProducts"].toString(),
+                        Icons.shopping_bag, Colors.purple),
+                  ],
                 ),
-              )),
-            if (topProducts == null || topProducts!.isEmpty)
-              const Text("Không có dữ liệu sản phẩm."),
-          ],
+                const SizedBox(height: 24),
+
+                Text("🏆 Top Nhân viên",
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (topEmployees != null && topEmployees!.isNotEmpty)
+                  ...topEmployees!.map((e) => Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.indigo.withOpacity(0.1),
+                        child: const Icon(Icons.person, color: Colors.indigo),
+                      ),
+                      title: Text(
+                        e["employee"].toString(),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        "Doanh thu: ${e["revenue"]} đ (${e["orders"]} đơn)",
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ),
+                  )),
+                if (topEmployees == null || topEmployees!.isEmpty)
+                  const Text("Không có dữ liệu nhân viên."),
+                const SizedBox(height: 24),
+
+                Text("🔥 Top sản phẩm bán chạy",
+                    style: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (topProducts != null && topProducts!.isNotEmpty)
+                  ...topProducts!.map((e) => Card(
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    child: ListTile(
+                      leading: CircleAvatar(
+                        backgroundColor: Colors.purple.withOpacity(0.1),
+                        child:
+                        const Icon(Icons.shopping_bag, color: Colors.purple),
+                      ),
+                      title: Text(
+                        e["product"].toString(),
+                        style: GoogleFonts.inter(fontWeight: FontWeight.w600),
+                      ),
+                      subtitle: Text(
+                        "Đã bán: ${e["qtySold"]} • Doanh thu: ${e["revenue"]} đ",
+                        style: const TextStyle(color: Colors.black54),
+                      ),
+                    ),
+                  )),
+                if (topProducts == null || topProducts!.isEmpty)
+                  const Text("Không có dữ liệu sản phẩm."),
+              ],
+            ),
+          ),
         ),
-      ),
+
     );
   }
 
   // ====== CARD TỔNG QUAN ======
+  // ===== Card Tổng quan (đơn/ doanh thu/ khách/ sản phẩm) =====
+  Widget _summaryCard(
+      String label,
+      String? value,
+      IconData icon,
+      Color color,
+      ) {
+    return LayoutBuilder(
+      builder: (ctx, cons) {
+        return Container(
+          // card co giãn, đẹp khi Wrap 2 cột
+          width: (MediaQuery.of(ctx).size.width - 16 * 2 - 12) / 2,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: const [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 6,
+                offset: Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                backgroundColor: color.withOpacity(0.12),
+                child: Icon(icon, color: color),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.black54,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      value ?? "-",
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   // ====== PHẦN THẺ TỔNG QUAN ĐẸP MẮT ======
   Widget _summarySection(BuildContext context) {
     final items = [
